@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  role          String    @default("CONSULTANT")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  clients       Client[]
+  decisions     Decision[]
+  auditLogs     AuditLog[]
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Client {
+  id                  String       @id @default(cuid())
+  name                String
+  industry            String
+  companySize         String
+  revenueRange        String
+  employeeCount       Int?
+  engagementObjective String?
+  primaryChallenge    String?
+  assessmentPeriod    String?
+  stakeholders        String?      // JSON array
+  consultantNotes     String?
+  status              String       @default("ACTIVE")
+  businessHealth      Float?       @default(0)
+  dataCompleteness    Float?       @default(0)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  userId              String
+  user                User         @relation(fields: [userId], references: [id])
+  assessments         Assessment[]
+  documents           Document[]
+  findings            Finding[]
+  risks               Risk[]
+  recommendations     Recommendation[]
+  decisions           Decision[]
+  actionPlans         ActionPlan[]
+  reports             Report[]
+  auditLogs           AuditLog[]
+  aiAnalyses          AIAnalysis[]
+}
+
+model Assessment {
+  id              String   @id @default(cuid())
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  objectives      String?  // JSON
+  challenges      String?  // JSON
+  stakeholders    String?  // JSON
+  status          String   @default("DRAFT")
+  step            Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Document {
+  id                String          @id @default(cuid())
+  clientId          String
+  client            Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  filename          String
+  originalName      String
+  mimeType          String
+  size              Int
+  extractedText     String?
+  processingStatus  String          @default("PENDING")
+  analysisStatus    String          @default("PENDING")
+  sourceReliability String          @default("MEDIUM")
+  documentType      String          @default("UNKNOWN")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  chunks            DocumentChunk[]
+  evidence          Evidence[]
+}
+
+model DocumentChunk {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content     String
+  chunkIndex  Int
+  createdAt   DateTime @default(now())
+}
+
+model AIAnalysis {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status        String   @default("PENDING")
+  stage         String   @default("INIT")
+  progress      Int      @default(0)
+  results       String?  // JSON
+  error         String?
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+}
+
+model Finding {
+  id                    String         @id @default(cuid())
+  clientId              String
+  client                Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title                 String
+  domain                String
+  severity              String         @default("MEDIUM")
+  confidence            Float          @default(0)
+  summary               String
+  rootCauseHypotheses   String?        // JSON
+  contradictingEvidence String?        // JSON
+  businessImpact        String?        // JSON
+  humanIntervention     String?        // JSON
+  status                String         @default("ACTIVE")
+  challenged            Boolean        @default(false)
+  challengeResult       String?        // JSON
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  evidence              Evidence[]
+  recommendations       Recommendation[]
+}
+
+model Evidence {
+  id          String   @id @default(cuid())
+  findingId   String
+  finding     Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id])
+  type        String   @default("SUPPORTING")
+  source      String
+  excerpt     String
+  relevance   Float    @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Risk {
+  id                String   @id @default(cuid())
+  clientId          String
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title             String
+  category          String
+  probability       String   @default("MEDIUM")
+  impact            String   @default("MEDIUM")
+  severity          String   @default("MEDIUM")
+  confidence        Float    @default(0)
+  description       String
+  mitigation        String?
+  humanReviewRequired Boolean @default(false)
+  status            String   @default("OPEN")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Recommendation {
+  id                String   @id @default(cuid())
+  clientId          String
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  findingId         String?
+  finding           Finding? @relation(fields: [findingId], references: [id])
+  title             String
+  rationale         String
+  expectedImpact    String?
+  implementationEffort String @default("MEDIUM")
+  priority          String   @default("MEDIUM")
+  confidence        Float    @default(0)
+  risk              String?
+  owner             String?
+  timeHorizon       String?
+  humanApprovalRequired Boolean @default(false)
+  status            String   @default("PENDING")
+  consultantDecision String? @default("PENDING")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  actionItems       ActionItem[]
+}
+
+model Decision {
+  id                String   @id @default(cuid())
+  clientId          String
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  recommendationId  String?
+  type              String
+  title             String
+  description       String?
+  status            String   @default("PENDING")
+  assignedOwner     String?
+  targetDate        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ActionPlan {
+  id          String     @id @default(cuid())
+  clientId    String
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  phase       String     @default("30")
+  status      String     @default("ACTIVE")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  actionItems ActionItem[]
+}
+
+model ActionItem {
+  id                String         @id @default(cuid())
+  actionPlanId      String
+  actionPlan        ActionPlan     @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  recommendationId  String?
+  recommendation    Recommendation? @relation(fields: [recommendationId], references: [id])
+  action            String
+  owner             String?
+  deadline          DateTime?
+  priority          String         @default("MEDIUM")
+  expectedImpact    String?
+  dependencies      String?        // JSON
+  status            String         @default("NOT_STARTED")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  content     String?  // JSON structured report
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String
+  entityType  String
+  entityId    String?
+  details     String?  // JSON
+  createdAt   DateTime @default(now())
+}
